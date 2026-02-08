@@ -6,7 +6,7 @@ Parameters:
     Type: AWS::EC2::VPC::Id
   SubnetId:
     Description: Subnet ID for EC2 Instance
-    Type: List<AWS::EC2::Subnet::Id>
+    Type: AWS::EC2::Subnet::Id
   LatestAL2023AmiId:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64'
@@ -52,6 +52,7 @@ Resources:
       IamInstanceProfile: !Ref IAMInstanceProfileDbconnectinstance
       SecurityGroupIds:
         - !Ref EC2SecurityGroup
+      SubnetId: !Ref SubnetId
       EbsOptimized: true
       DisableApiTermination: false
       SourceDestCheck: true
