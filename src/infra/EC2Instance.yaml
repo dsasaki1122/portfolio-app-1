@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  VpcId:
+    Description: VPC ID for SG and EC2 Instance
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Description: Subnet ID for EC2 Instance
+    Type: List<AWS::EC2::Subnet::Id>
+  LatestAL2023AmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64'
+
+Resources:
+
+  # セキュリティグループ
+  EC2SecurityGroup:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      GroupDescription: "SecurityGroup for the EC2 instance"
+      GroupName: "ec2-security-group"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+      - CidrIp: "172.31.48.0/25"
+        IpProtocol: "-1"
+        Description: "Allow  all trafics from VPC"
+        FromPort: -1
+        ToPort: -1
+      SecurityGroupEgress:
+      - CidrIp: "0.0.0.0/0"
+        IpProtocol: "-1"
+        FromPort: -1
+        ToPort: -1
+
+  # EC2 インスタンス
+  EC2Instance:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::EC2::Instance"
+    DeletionPolicy: "Delete"
+    Properties:
+      InstanceInitiatedShutdownBehavior: "stop"
+      BlockDeviceMappings:
+      - Ebs:
+          VolumeType: "gp3"
+          Iops: 3000
+          VolumeSize: 30
+          Encrypted: false
+          DeleteOnTermination: true
+        DeviceName: "/dev/xvda"
+      IamInstanceProfile: !Ref IAMInstanceProfileDbconnectinstance
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      EbsOptimized: true
+      DisableApiTermination: false
+      SourceDestCheck: true
+      VpcId: !Ref VpcId
+      ImageId: !Ref LatestAL2023AmiId
+      InstanceType: "t3.micro"
+      Monitoring: false
+      Tags:
+      - Value: "MyInstance"
+        Key: "Name"
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          dnf update -y
+          dnf install -y https://dev.mysql.com/get/mysql84-community-release-el9-1.noarch.rpm
+          dnf install -y mysql mysql-community-client
+
+  # IAM インスタンスプロファイル
+  IAMInstanceProfileDbconnectinstance:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::IAM::InstanceProfile"
+    DeletionPolicy: "Delete"
+    Properties:
+      Path: "/"
+      Roles:
+      - Ref: "IAMRoleDbconnectinstance"
+      InstanceProfileName:
+        Ref: "IAMRoleDbconnectinstance"
+
+  # IAM ロール
+  IAMRoleDbconnectinstance:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      Path: "/"
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/AmazonSSMManagedEC2InstanceDefaultPolicy"
+      - "arn:aws:iam::aws:policy/AWSSecretsManagerClientReadOnlyAccess"
+      MaxSessionDuration: 3600
+      RoleName: "db-connect-for-ec2instance"
+      Description: "Allows EC2 instances to call AWS services on your behalf."
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Action: "sts:AssumeRole"
+          Effect: "Allow"
+          Principal:
+            Service: "ec2.amazonaws.com"

@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  VpcId:
+    Description: VPC ID for Aurora
+    Type: AWS::EC2::VPC::Id
+
+Resources:
+
+  # サブネット1
+  RDSSubnet1:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    Properties:
+      MapPublicIpOnLaunch: false
+      EnableDns64: false
+      VpcId: !Ref VpcId
+      AvailabilityZoneId: "apne1-az4"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      CidrBlock: "172.31.48.0/25"
+      Ipv6Native: false
+      Tags:
+      - Value: "RDS-Pvt-subnet-3"
+        Key: "Name"
+
+  # サブネット2
+  RDSSubnet2:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    Properties:
+      MapPublicIpOnLaunch: false
+      EnableDns64: false
+      VpcId: !Ref VpcId
+      AvailabilityZoneId: "apne1-az2"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      CidrBlock: "172.31.48.128/25"
+      Ipv6Native: false
+      Tags:
+      - Value: "RDS-Pvt-subnet-2"
+        Key: "Name"
+
+  # サブネット3
+  RDSSubnet3:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    Properties:
+      MapPublicIpOnLaunch: false
+      EnableDns64: false
+      VpcId: !Ref VpcId
+      AvailabilityZoneId: "apne1-az1"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      CidrBlock: "172.31.49.0/25"
+      Ipv6Native: false
+      Tags:
+      - Value: "RDS-Pvt-subnet-1"
+        Key: "Name"
+
+  # RDS クラスター
+  RDSDBCluster:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::RDS::DBCluster"
+    DeletionPolicy: "Delete"
+    Properties:
+      DatabaseInsightsMode: "standard"
+      StorageEncrypted: true
+      AssociatedRoles: []
+      EnableHttpEndpoint: false
+      EngineMode: "provisioned"
+      Port: 3306
+      DBClusterIdentifier: "database-1"
+      MonitoringInterval: 0
+      NetworkType: "IPV4"
+      VpcSecurityGroupIds:
+      - !Ref RDSSecurityGroup
+      CopyTagsToSnapshot: true
+      Engine: "aurora-mysql"
+      Tags: []
+      EngineLifecycleSupport: "open-source-rds-extended-support-disabled"
+      EngineVersion: "8.0.mysql_aurora.3.10.3"
+      StorageType: "aurora"
+      AvailabilityZones:
+      - "ap-northeast-1a"
+      - "ap-northeast-1c"
+      - "ap-northeast-1d"
+      EnableLocalWriteForwarding: false
+      AutoMinorVersionUpgrade: true
+      DBSubnetGroupName:
+        Ref: "RDSDBSubnetGroupRdsec2dbsubnetgroup1"
+      DeletionProtection: false
+      ManageMasterUserPassword: true
+      MasterUsername: "admin"
+      EnableIAMDatabaseAuthentication: false
+      DBClusterParameterGroupName: "default.aurora-mysql8.0"
+      BackupRetentionPeriod: 1
+      EnableCloudwatchLogsExports: []
+
+  # RDS サブネットグループ
+  RDSDBSubnetGroupRdsec2dbsubnetgroup1:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::RDS::DBSubnetGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      DBSubnetGroupDescription: "RDS SubnetGroup"
+      SubnetIds:
+      - Ref: "RDSSubnet1"
+      - Ref: "RDSSubnet2"
+      - Ref: "RDSSubnet3"
+      DBSubnetGroupName: "rds-ec2-db-subnet-group-1"
+
+  # RDS インスタンス
+  RDSDBInstance:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::RDS::DBInstance"
+    DeletionPolicy: "Delete"
+    Properties:
+      DBClusterIdentifier: !Ref RDSDBCluster
+      Engine: "aurora-mysql"
+      StorageThroughput: 0
+      DBParameterGroupName: "default.aurora-mysql8.0"
+      DedicatedLogVolume: false
+      Tags: []
+      LicenseModel: "general-public-license"
+      DBInstanceClass: "db.t3.medium"
+      AvailabilityZone: "ap-northeast-1a"
+      OptionGroupName: "default:aurora-mysql-8-0"
+      EnablePerformanceInsights: false
+      DBInstanceIdentifier: "database-1-instance-1"
+      BackupTarget: "region"
+      CACertificateIdentifier: "rds-ca-rsa2048-g1"
+      PromotionTier: 1
+      PubliclyAccessible: false
+
+  # RDS 用のセキュリティグループ
+  RDSSecurityGroup:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      GroupDescription: "Security group attached to database-1 to allow the access from VPC"
+      GroupName: "security-group-for-rds"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+      - CidrIp: "172.31.0.0/16"
+        IpProtocol: "tcp"
+        Description: "Rule to allow connections from VPC"
+        FromPort: 3306
+        ToPort: 3306
+      SecurityGroupEgress:
+      - CidrIp: "0.0.0.0/0"
+        IpProtocol: "-1"
+        FromPort: -1
+        ToPort: -1
