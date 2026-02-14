@@ -6,7 +6,6 @@ Parameters:
     Type: AWS::EC2::VPC::Id
 
 Resources:
-
   # サブネット1
   RDSSubnet1:
     UpdateReplacePolicy: "Delete"
@@ -24,8 +23,8 @@ Resources:
       CidrBlock: "172.31.48.0/25"
       Ipv6Native: false
       Tags:
-      - Value: "RDS-Pvt-subnet-3"
-        Key: "Name"
+        - Value: "RDS-Pvt-subnet-3"
+          Key: "Name"
 
   # サブネット2
   RDSSubnet2:
@@ -44,8 +43,8 @@ Resources:
       CidrBlock: "172.31.48.128/25"
       Ipv6Native: false
       Tags:
-      - Value: "RDS-Pvt-subnet-2"
-        Key: "Name"
+        - Value: "RDS-Pvt-subnet-2"
+          Key: "Name"
 
   # サブネット3
   RDSSubnet3:
@@ -64,8 +63,8 @@ Resources:
       CidrBlock: "172.31.49.0/25"
       Ipv6Native: false
       Tags:
-      - Value: "RDS-Pvt-subnet-1"
-        Key: "Name"
+        - Value: "RDS-Pvt-subnet-1"
+          Key: "Name"
 
   # RDS クラスター
   RDSDBCluster:
@@ -83,7 +82,7 @@ Resources:
       MonitoringInterval: 0
       NetworkType: "IPV4"
       VpcSecurityGroupIds:
-      - !Ref RDSSecurityGroup
+        - !Ref RDSSecurityGroup
       CopyTagsToSnapshot: true
       Engine: "aurora-mysql"
       Tags: []
@@ -91,9 +90,13 @@ Resources:
       EngineVersion: "8.0.mysql_aurora.3.10.3"
       StorageType: "aurora"
       AvailabilityZones:
-      - "ap-northeast-1a"
-      - "ap-northeast-1c"
-      - "ap-northeast-1d"
+        - "ap-northeast-1a"
+        - "ap-northeast-1c"
+        - "ap-northeast-1d"
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 0
+        SecondsUntilAutoPause: 300
+        MaxCapacity: 4
       EnableLocalWriteForwarding: false
       AutoMinorVersionUpgrade: true
       DBSubnetGroupName:
@@ -114,9 +117,9 @@ Resources:
     Properties:
       DBSubnetGroupDescription: "RDS SubnetGroup"
       SubnetIds:
-      - Ref: "RDSSubnet1"
-      - Ref: "RDSSubnet2"
-      - Ref: "RDSSubnet3"
+        - Ref: "RDSSubnet1"
+        - Ref: "RDSSubnet2"
+        - Ref: "RDSSubnet3"
       DBSubnetGroupName: "rds-ec2-db-subnet-group-1"
 
   # RDS インスタンス
@@ -132,7 +135,7 @@ Resources:
       DedicatedLogVolume: false
       Tags: []
       LicenseModel: "general-public-license"
-      DBInstanceClass: "db.t3.medium"
+      DBInstanceClass: "db.serverless"
       AvailabilityZone: "ap-northeast-1a"
       OptionGroupName: "default:aurora-mysql-8-0"
       EnablePerformanceInsights: false
@@ -152,13 +155,13 @@ Resources:
       GroupName: "security-group-for-rds"
       VpcId: !Ref VpcId
       SecurityGroupIngress:
-      - CidrIp: "172.31.0.0/16"
-        IpProtocol: "tcp"
-        Description: "Rule to allow connections from VPC"
-        FromPort: 3306
-        ToPort: 3306
+        - CidrIp: "172.31.0.0/16"
+          IpProtocol: "tcp"
+          Description: "Rule to allow connections from VPC"
+          FromPort: 3306
+          ToPort: 3306
       SecurityGroupEgress:
-      - CidrIp: "0.0.0.0/0"
-        IpProtocol: "-1"
-        FromPort: -1
-        ToPort: -1
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+          FromPort: -1
+          ToPort: -1
