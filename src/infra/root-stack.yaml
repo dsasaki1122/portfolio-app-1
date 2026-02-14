@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Gohanya-san App infrastructure (Root Stack)
+
+Metadata:
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label:
+          default: "Project Name Prefix"
+        Parameters:
+          - PJPrefix
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - VPCCIDR
+          - PublicSubnetACIDR
+          - PublicSubnetCCIDR
+          - PrivateSubnetACIDR
+          - PrivateSubnetCCIDR
+    ParameterLabels:
+      VPCCIDR:
+        default: "VPC CIDR"
+      PublicSubnetACIDR:
+        default: "PublicSubnetA CIDR"
+      PublicSubnetCCIDR:
+        default: "PublicSubnetC CIDR"
+      PrivateSubnetACIDR:
+        default: "PrivateSubnetA CIDR"
+      PrivateSubnetCCIDR:
+        default: "PrivateSubnetC CIDR"
+
+# ------------------------------------------------------------#
+# Input Parameters
+# ------------------------------------------------------------#
+Parameters:
+  PJPrefix:
+    Type: String
+    Default: "gohanyaApp"
+
+  VPCCIDR:
+    Type: String
+    Default: "10.0.0.0/16"
+
+  PublicSubnetACIDR:
+    Type: String
+    Default: "10.0.0.0/20"
+
+  PublicSubnetCCIDR:
+    Type: String
+    Default: "10.0.16.0/20"
+
+  PrivateSubnetACIDR:
+    Type: String
+    Default: "10.0.128.0/20"
+
+  PrivateSubnetCCIDR:
+    Type: String
+    Default: "10.0.144.0/20"
+
+Resources:
+  # ------------------------------------------------------------#
+  #  VPC Nested Stack
+  # ------------------------------------------------------------#
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://gohanya-app-cfn-template.s3.ap-northeast-1.amazonaws.com/child/vpc.yaml
+      Parameters:
+        PJPrefix: !Ref PJPrefix
+        VPCCIDR: !Ref VPCCIDR
+        PublicSubnetACIDR: !Ref PublicSubnetACIDR
+        PublicSubnetCCIDR: !Ref PublicSubnetCCIDR
+        PrivateSubnetACIDR: !Ref PrivateSubnetACIDR
+        PrivateSubnetCCIDR: !Ref PrivateSubnetCCIDR
+
+  # ------------------------------------------------------------#
+  #  RDS Nested Stack
+  # ------------------------------------------------------------#
+  RDSStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://gohanya-app-cfn-template.s3.ap-northeast-1.amazonaws.com/child/rds.yaml
+      Parameters:
+        PJPrefix: !Ref PJPrefix
+        VPCCIDR: !Ref VPCCIDR
+        VPCId: !GetAtt VPCStack.Outputs.VPC
+        PrivateSubnetA: !GetAtt VPCStack.Outputs.PrivateSubnetA
+        PrivateSubnetC: !GetAtt VPCStack.Outputs.PrivateSubnetC

@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: RDS Nested Stack
+
+# ------------------------------------------------------------#
+# Input Parameters
+# ------------------------------------------------------------#
+Parameters:
+  PJPrefix:
+    Type: String
+
+  VPCId:
+    Type: String
+
+  VPCCIDR:
+    Type: String
+
+  PrivateSubnetA:
+    Type: String
+
+  PrivateSubnetC:
+    Type: String
+
+Resources:
+  # ------------------------------------------------------------#
+  #  RDS Security Group
+  # ------------------------------------------------------------#
+  RDSSecurityGroup:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      GroupDescription: "Security group attached to database-1 to allow the access from VPC"
+      GroupName: "security-group-for-rds"
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - CidrIp: !Ref VPCCIDR
+          IpProtocol: "tcp"
+          Description: "Rule to allow connections from VPC"
+          FromPort: 3306
+          ToPort: 3306
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+          FromPort: -1
+          ToPort: -1
+
+  # ------------------------------------------------------------#
+  #  RDS Subnet Group
+  # ------------------------------------------------------------#
+  RDSDBSubnetGroup:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::RDS::DBSubnetGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      DBSubnetGroupDescription: "RDS SubnetGroup"
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetC
+      DBSubnetGroupName: !Sub "${PJPrefix}-db-subnet-group"
+
+  # ------------------------------------------------------------#
+  #  RDS Cluster
+  # ------------------------------------------------------------#
+  RDSDBCluster:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::RDS::DBCluster"
+    DeletionPolicy: "Delete"
+    Properties:
+      Engine: "aurora-mysql"
+      EngineVersion: "8.0.mysql_aurora.3.10.3"
+      DBClusterIdentifier: !Sub "${PJPrefix}-db-cluster"
+      VpcSecurityGroupIds:
+        - !Ref RDSSecurityGroup
+      DBSubnetGroupName: !Ref RDSDBSubnetGroup
+      MasterUsername: "admin"
+      ManageMasterUserPassword: true
+      BackupRetentionPeriod: 1
+      Port: 3306
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 0
+        MaxCapacity: 4
+
+  # ------------------------------------------------------------#
+  #  RDS DB Instance
+  # ------------------------------------------------------------#
+  RDSDBInstance:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::RDS::DBInstance"
+    DeletionPolicy: "Delete"
+    Properties:
+      DBClusterIdentifier: !Ref RDSDBCluster
+      Engine: "aurora-mysql"
+      DBInstanceClass: "db.serverless"
+      DBInstanceIdentifier: !Sub "${PJPrefix}-db-instance"
+      PubliclyAccessible: false
