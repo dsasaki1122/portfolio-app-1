@@ -1,72 +1,230 @@
 AWSTemplateFormatVersion: 2010-09-09
+Description: Gohanya-san App infrastructure
 
+Metadata:
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label:
+          default: "Project Name Prefix"
+        Parameters:
+          - PJPrefix
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - VPCCIDR
+          - PublicSubnetACIDR
+          - PublicSubnetCCIDR
+          - PrivateSubnetACIDR
+          - PrivateSubnetCCIDR
+    ParameterLabels:
+      VPCCIDR:
+        default: "VPC CIDR"
+      PublicSubnetACIDR:
+        default: "PublicSubnetA CIDR"
+      PublicSubnetCCIDR:
+        default: "PublicSubnetC CIDR"
+      PrivateSubnetACIDR:
+        default: "PrivateSubnetA CIDR"
+      PrivateSubnetCCIDR:
+        default: "PrivateSubnetC CIDR"
+
+# ------------------------------------------------------------#
+# Input Parameters
+# ------------------------------------------------------------#
 Parameters:
-  VpcId:
-    Description: VPC ID for Aurora
-    Type: AWS::EC2::VPC::Id
+  PJPrefix:
+    Type: String
+
+  VPCCIDR:
+    Type: String
+    Default: "10.0.0.0/16"
+
+  PublicSubnetACIDR:
+    Type: String
+    Default: "10.0.0.0/20"
+
+  PublicSubnetCCIDR:
+    Type: String
+    Default: "10.0.16.0/20"
+
+  PrivateSubnetACIDR:
+    Type: String
+    Default: "10.0.128.0/20"
+
+  PrivateSubnetCCIDR:
+    Type: String
+    Default: "10.0.144.0/20"
 
 Resources:
-  # サブネット1
-  RDSSubnet1:
-    UpdateReplacePolicy: "Delete"
-    Type: "AWS::EC2::Subnet"
-    DeletionPolicy: "Delete"
+  # ------------------------------------------------------------#
+  #  VPC
+  # ------------------------------------------------------------#
+  # VPC
+  VPC:
+    Type: "AWS::EC2::VPC"
     Properties:
-      MapPublicIpOnLaunch: false
-      EnableDns64: false
-      VpcId: !Ref VpcId
-      AvailabilityZoneId: "apne1-az4"
-      PrivateDnsNameOptionsOnLaunch:
-        EnableResourceNameDnsARecord: false
-        HostnameType: "ip-name"
-        EnableResourceNameDnsAAAARecord: false
-      CidrBlock: "172.31.48.0/25"
-      Ipv6Native: false
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      InstanceTenancy: default
       Tags:
-        - Value: "RDS-Pvt-subnet-3"
-          Key: "Name"
+        - Key: Name
+          Value: !Sub "${PJPrefix}-vpc"
 
-  # サブネット2
-  RDSSubnet2:
-    UpdateReplacePolicy: "Delete"
-    Type: "AWS::EC2::Subnet"
-    DeletionPolicy: "Delete"
+  # InternetGateway
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
     Properties:
-      MapPublicIpOnLaunch: false
-      EnableDns64: false
-      VpcId: !Ref VpcId
-      AvailabilityZoneId: "apne1-az2"
-      PrivateDnsNameOptionsOnLaunch:
-        EnableResourceNameDnsARecord: false
-        HostnameType: "ip-name"
-        EnableResourceNameDnsAAAARecord: false
-      CidrBlock: "172.31.48.128/25"
-      Ipv6Native: false
       Tags:
-        - Value: "RDS-Pvt-subnet-2"
-          Key: "Name"
+        - Key: Name
+          Value: !Sub "${PJPrefix}-igw"
 
-  # サブネット3
-  RDSSubnet3:
-    UpdateReplacePolicy: "Delete"
-    Type: "AWS::EC2::Subnet"
-    DeletionPolicy: "Delete"
+  # IGW Attach
+  InternetGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
     Properties:
-      MapPublicIpOnLaunch: false
-      EnableDns64: false
-      VpcId: !Ref VpcId
-      AvailabilityZoneId: "apne1-az1"
-      PrivateDnsNameOptionsOnLaunch:
-        EnableResourceNameDnsARecord: false
-        HostnameType: "ip-name"
-        EnableResourceNameDnsAAAARecord: false
-      CidrBlock: "172.31.49.0/25"
-      Ipv6Native: false
-      Tags:
-        - Value: "RDS-Pvt-subnet-1"
-          Key: "Name"
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
 
-  # RDS クラスター
+  # ------------------------------------------------------------#
+  #  Subnet
+  # ------------------------------------------------------------#
+  # Public SubnetA
+  PublicSubnetA:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: !Ref PublicSubnetACIDR
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-public-subnet-a"
+
+  # Public SubnetC
+  PublicSubnetC:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-northeast-1c"
+      CidrBlock: !Ref PublicSubnetCCIDR
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-public-subnet-c"
+
+  # Private SubnetA
+  PrivateSubnetA:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: !Ref PrivateSubnetACIDR
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-private-subnet-a"
+
+  # Private SubnetC
+  PrivateSubnetC:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-northeast-1c"
+      CidrBlock: !Ref PrivateSubnetCCIDR
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-private-subnet-c"
+
+  # ------------------------------------------------------------#
+  #  RouteTable
+  # ------------------------------------------------------------#
+  # Public RouteTableA
+  PublicRouteTableA:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-public-route-a"
+
+  # Public RouteTableC
+  PublicRouteTableC:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-public-route-c"
+
+  # Private RouteTableA
+  PrivateRouteTableA:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-private-route-a"
+
+  # Private RouteTableC
+  PrivateRouteTableC:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-private-route-c"
+
+  # ------------------------------------------------------------#
+  # Routing
+  # ------------------------------------------------------------#
+  # PublicRouteA
+  PublicRouteA:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref PublicRouteTableA
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+
+  # PublicRouteC
+  PublicRouteC:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref PublicRouteTableC
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+
+  # ------------------------------------------------------------#
+  # RouteTable Associate
+  # ------------------------------------------------------------#
+  # PublicRouteTable Associate SubnetA
+  PublicSubnetARouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTableA
+
+  # PublicRouteTable Associate SubnetC
+  PublicSubnetCRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      RouteTableId: !Ref PublicRouteTableC
+
+  # PrivateRouteTable Associate SubnetA
+  PrivateSubnetARouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTableA
+
+  # PrivateRouteTable Associate SubnetC
+  PrivateSubnetCRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnetC
+      RouteTableId: !Ref PrivateRouteTableC
+
+  # ------------------------------------------------------------#
+  #  RDS Cluster
+  # ------------------------------------------------------------#
   RDSDBCluster:
     UpdateReplacePolicy: "Delete"
     Type: "AWS::RDS::DBCluster"
@@ -78,7 +236,7 @@ Resources:
       EnableHttpEndpoint: false
       EngineMode: "provisioned"
       Port: 3306
-      DBClusterIdentifier: "database-1"
+      DBClusterIdentifier: !Sub "${PJPrefix}-db-cluster"
       MonitoringInterval: 0
       NetworkType: "IPV4"
       VpcSecurityGroupIds:
@@ -92,7 +250,6 @@ Resources:
       AvailabilityZones:
         - "ap-northeast-1a"
         - "ap-northeast-1c"
-        - "ap-northeast-1d"
       ServerlessV2ScalingConfiguration:
         MinCapacity: 0
         SecondsUntilAutoPause: 300
@@ -100,7 +257,7 @@ Resources:
       EnableLocalWriteForwarding: false
       AutoMinorVersionUpgrade: true
       DBSubnetGroupName:
-        Ref: "RDSDBSubnetGroupRdsec2dbsubnetgroup1"
+        Ref: "RDSDBSubnetGroup"
       DeletionProtection: false
       ManageMasterUserPassword: true
       MasterUsername: "admin"
@@ -109,20 +266,23 @@ Resources:
       BackupRetentionPeriod: 1
       EnableCloudwatchLogsExports: []
 
-  # RDS サブネットグループ
-  RDSDBSubnetGroupRdsec2dbsubnetgroup1:
+  # ------------------------------------------------------------#
+  #  RDS Subnet Group
+  # ------------------------------------------------------------#
+  RDSDBSubnetGroup:
     UpdateReplacePolicy: "Delete"
     Type: "AWS::RDS::DBSubnetGroup"
     DeletionPolicy: "Delete"
     Properties:
       DBSubnetGroupDescription: "RDS SubnetGroup"
       SubnetIds:
-        - Ref: "RDSSubnet1"
-        - Ref: "RDSSubnet2"
-        - Ref: "RDSSubnet3"
-      DBSubnetGroupName: "rds-ec2-db-subnet-group-1"
+        - Ref: "PrivateSubnetA"
+        - Ref: "PrivateSubnetC"
+      DBSubnetGroupName: !Sub "${PJPrefix}-db-subnet-group"
 
-  # RDS インスタンス
+  # ------------------------------------------------------------#
+  #  RDS DB Instance
+  # ------------------------------------------------------------#
   RDSDBInstance:
     UpdateReplacePolicy: "Delete"
     Type: "AWS::RDS::DBInstance"
@@ -139,13 +299,15 @@ Resources:
       AvailabilityZone: "ap-northeast-1a"
       OptionGroupName: "default:aurora-mysql-8-0"
       EnablePerformanceInsights: false
-      DBInstanceIdentifier: "database-1-instance-1"
+      DBInstanceIdentifier: !Sub "${PJPrefix}-db-instance"
       BackupTarget: "region"
       CACertificateIdentifier: "rds-ca-rsa2048-g1"
       PromotionTier: 1
       PubliclyAccessible: false
 
-  # RDS 用のセキュリティグループ
+  # ------------------------------------------------------------#
+  #  RDS Security Group
+  # ------------------------------------------------------------#
   RDSSecurityGroup:
     UpdateReplacePolicy: "Delete"
     Type: "AWS::EC2::SecurityGroup"
@@ -153,9 +315,9 @@ Resources:
     Properties:
       GroupDescription: "Security group attached to database-1 to allow the access from VPC"
       GroupName: "security-group-for-rds"
-      VpcId: !Ref VpcId
+      VpcId: !Ref VPC
       SecurityGroupIngress:
-        - CidrIp: "172.31.0.0/16"
+        - CidrIp: !Ref VPCCIDR
           IpProtocol: "tcp"
           Description: "Rule to allow connections from VPC"
           FromPort: 3306
@@ -165,3 +327,80 @@ Resources:
           IpProtocol: "-1"
           FromPort: -1
           ToPort: -1
+
+# ------------------------------------------------------------#
+# Output Parameters
+# ------------------------------------------------------------#
+Outputs:
+  # VPC
+  VPC:
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${PJPrefix}-vpc"
+
+  VPCCIDR:
+    Value: !Ref VPCCIDR
+    Export:
+      Name: !Sub "${PJPrefix}-vpc-cidr"
+
+  # Subnet
+  PublicSubnetA:
+    Value: !Ref PublicSubnetA
+    Export:
+      Name: !Sub "${PJPrefix}-public-subnet-a"
+
+  PublicSubnetACIDR:
+    Value: !Ref PublicSubnetACIDR
+    Export:
+      Name: !Sub "${PJPrefix}-public-subnet-a-cidr"
+
+  PublicSubnetC:
+    Value: !Ref PublicSubnetC
+    Export:
+      Name: !Sub "${PJPrefix}-public-subnet-c"
+
+  PublicSubnetCCIDR:
+    Value: !Ref PublicSubnetCCIDR
+    Export:
+      Name: !Sub "${PJPrefix}-public-subnet-c-cidr"
+
+  PrivateSubnetA:
+    Value: !Ref PrivateSubnetA
+    Export:
+      Name: !Sub "${PJPrefix}-private-subnet-a"
+
+  PrivateSubnetACIDR:
+    Value: !Ref PrivateSubnetACIDR
+    Export:
+      Name: !Sub "${PJPrefix}-private-subnet-a-cidr"
+
+  PrivateSubnetC:
+    Value: !Ref PrivateSubnetC
+    Export:
+      Name: !Sub "${PJPrefix}-private-subnet-c"
+
+  PrivateSubnetCCIDR:
+    Value: !Ref PrivateSubnetCCIDR
+    Export:
+      Name: !Sub "${PJPrefix}-private-subnet-c-cidr"
+
+  # Route
+  PublicRouteTableA:
+    Value: !Ref PublicRouteTableA
+    Export:
+      Name: !Sub "${PJPrefix}-public-route-a"
+
+  PublicRouteTableC:
+    Value: !Ref PublicRouteTableC
+    Export:
+      Name: !Sub "${PJPrefix}-public-route-c"
+
+  PrivateRouteTableA:
+    Value: !Ref PrivateRouteTableA
+    Export:
+      Name: !Sub "${PJPrefix}-private-route-a"
+
+  PrivateRouteTableC:
+    Value: !Ref PrivateRouteTableC
+    Export:
+      Name: !Sub "${PJPrefix}-private-route-c"
