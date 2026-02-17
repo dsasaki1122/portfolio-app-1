@@ -34,7 +34,7 @@ Metadata:
 Parameters:
   PJPrefix:
     Type: String
-    Default: "gohanyaApp"
+    Default: "gohanyaapp"
 
   VPCCIDR:
     Type: String
@@ -85,3 +85,31 @@ Resources:
         VPCId: !GetAtt VPCStack.Outputs.VPC
         PrivateSubnetA: !GetAtt VPCStack.Outputs.PrivateSubnetA
         PrivateSubnetC: !GetAtt VPCStack.Outputs.PrivateSubnetC
+
+  # ------------------------------------------------------------#
+  #  ALB Nested Stack
+  # ------------------------------------------------------------#
+  ALBStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://gohanya-app-cfn-template.s3.ap-northeast-1.amazonaws.com/child/alb.yaml
+      Parameters:
+        PJPrefix: !Ref PJPrefix
+        VPCId: !GetAtt VPCStack.Outputs.VPC
+        PrivateSubnetA: !GetAtt VPCStack.Outputs.PrivateSubnetA
+        PrivateSubnetC: !GetAtt VPCStack.Outputs.PrivateSubnetC
+
+  # ------------------------------------------------------------#
+  #  ECS Nested Stack
+  # ------------------------------------------------------------#
+  ECSStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://gohanya-app-cfn-template.s3.ap-northeast-1.amazonaws.com/child/ecs.yaml
+      Parameters:
+        PJPrefix: !Ref PJPrefix
+        VPCCIDR: !Ref VPCCIDR
+        VPCId: !GetAtt VPCStack.Outputs.VPC
+        PrivateSubnetA: !GetAtt VPCStack.Outputs.PrivateSubnetA
+        PrivateSubnetC: !GetAtt VPCStack.Outputs.PrivateSubnetC
+        TargetGroup: !GetAtt ALBStack.Outputs.TargetGroup
