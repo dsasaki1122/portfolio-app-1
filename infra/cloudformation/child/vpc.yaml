@@ -198,3 +198,9 @@ Outputs:
 
   PrivateSubnetC:
     Value: !Ref PrivateSubnetC
+
+  PublicSubnetA:
+    Value: !Ref PublicSubnetA
+
+  PublicSubnetC:
+    Value: !Ref PublicSubnetC

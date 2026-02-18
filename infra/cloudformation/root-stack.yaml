@@ -36,6 +36,14 @@ Parameters:
     Type: String
     Default: "gohanyaapp"
 
+  InUse:
+    Type: String
+    Default: "false"
+    Description: "Whether to create ALB and ECS tasks. Set to true when creating resources."
+    AllowedValues:
+      - "true"
+      - "false"
+
   VPCCIDR:
     Type: String
     Default: "10.0.0.0/16"
@@ -95,9 +103,10 @@ Resources:
       TemplateURL: https://gohanya-app-cfn-template.s3.ap-northeast-1.amazonaws.com/child/alb.yaml
       Parameters:
         PJPrefix: !Ref PJPrefix
+        InUse: !Ref InUse
         VPCId: !GetAtt VPCStack.Outputs.VPC
-        PrivateSubnetA: !GetAtt VPCStack.Outputs.PrivateSubnetA
-        PrivateSubnetC: !GetAtt VPCStack.Outputs.PrivateSubnetC
+        PublicSubnetA: !GetAtt VPCStack.Outputs.PublicSubnetA
+        PublicSubnetC: !GetAtt VPCStack.Outputs.PublicSubnetC
 
   # ------------------------------------------------------------#
   #  ECS Nested Stack
@@ -108,8 +117,9 @@ Resources:
       TemplateURL: https://gohanya-app-cfn-template.s3.ap-northeast-1.amazonaws.com/child/ecs.yaml
       Parameters:
         PJPrefix: !Ref PJPrefix
+        InUse: !Ref InUse
         VPCCIDR: !Ref VPCCIDR
         VPCId: !GetAtt VPCStack.Outputs.VPC
-        PrivateSubnetA: !GetAtt VPCStack.Outputs.PrivateSubnetA
-        PrivateSubnetC: !GetAtt VPCStack.Outputs.PrivateSubnetC
+        PublicSubnetA: !GetAtt VPCStack.Outputs.PublicSubnetA
+        PublicSubnetC: !GetAtt VPCStack.Outputs.PublicSubnetC
         TargetGroup: !GetAtt ALBStack.Outputs.TargetGroup
