@@ -8,20 +8,29 @@ Parameters:
   PJPrefix:
     Type: String
 
+  InUse:
+    Type: String
+
   VPCId:
     Type: String
 
   VPCCIDR:
     Type: String
 
-  PrivateSubnetA:
+  PublicSubnetA:
     Type: String
 
-  PrivateSubnetC:
+  PublicSubnetC:
     Type: String
 
   TargetGroup:
     Type: String
+
+# ------------------------------------------------------------#
+# Conditions
+# ------------------------------------------------------------#
+Conditions:
+  CreateResources: !Equals [!Ref InUse, "true"]
 
 Resources:
   # ------------------------------------------------------------#
@@ -122,7 +131,6 @@ Resources:
       Configuration:
         ExecuteCommandConfiguration:
           Logging: "DEFAULT"
-      Tags:
 
   # ------------------------------------------------------------#
   #  ECS Service
@@ -135,24 +143,28 @@ Resources:
         - CapacityProvider: "FARGATE"
           Base: "0"
           Weight: "1"
-      TaskDefinition: "arn:aws:ecs:ap-northeast-1:121946529112:task-definition/gohanyaapp:2" #修正
+      TaskDefinition: !Ref ECSTaskDefinition
       ServiceName: !Sub "${PJPrefix}-ecs-service"
       SchedulingStrategy: "REPLICA"
-      DesiredCount: "1"
+      DesiredCount: !If
+        - CreateResources
+        - 1
+        - 0
       AvailabilityZoneRebalancing: "ENABLED"
-      LoadBalancers:
-        - ContainerName: "gohanyaapp"
-          ContainerPort: "3000"
-          TargetGroupArn:
-            Ref: "TargetGroup"
+      LoadBalancers: !If
+        - CreateResources
+        - - ContainerName: "gohanyaapp"
+            ContainerPort: "3000"
+            TargetGroupArn: !Ref TargetGroup
+        - !Ref "AWS::NoValue"
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: "ENABLED"
           SecurityGroups:
             - Ref: "ECSSecurityGroup"
           Subnets:
-            - !Ref PrivateSubnetA
-            - !Ref PrivateSubnetC
+            - !Ref PublicSubnetA
+            - !Ref PublicSubnetC
       PlatformVersion: "LATEST"
       DeploymentConfiguration:
         DeploymentCircuitBreaker:
@@ -165,16 +177,13 @@ Resources:
         Type: "ECS"
       ServiceConnectConfiguration:
         Enabled: "false"
-      Tags:
       EnableECSManagedTags: "true"
       EnableExecuteCommand: "true"
-    DependsOn:
-      - "Listener"
 
   # ------------------------------------------------------------#
   #  ECS Task Definition
   # ------------------------------------------------------------#
-  ECSTaskDefinitionTaskdefinitiongohanyaapp3:
+  ECSTaskDefinition:
     UpdateReplacePolicy: "Delete"
     Type: "AWS::ECS::TaskDefinition"
     DeletionPolicy: "Delete"
@@ -183,9 +192,7 @@ Resources:
         Fn::GetAtt:
           - "IAMRoleECSExec"
           - "Arn"
-      InferenceAccelerators: []
       Memory: "2048"
-      PlacementConstraints: []
       Cpu: "512"
       RequiresCompatibilities:
         - "FARGATE"
@@ -193,51 +200,30 @@ Resources:
       EnableFaultInjection: false
       ExecutionRoleArn:
         Fn::GetAtt:
-          - "gohanyaapp-ECSTaskExecutionRole"
+          - "ECSTaskExecutionRole"
           - "Arn"
       RuntimePlatform:
         OperatingSystemFamily: "LINUX"
         CpuArchitecture: "ARM64"
-      Volumes: []
       ContainerDefinitions:
-        - ExtraHosts: []
-          Secrets: []
-          VolumesFrom: []
-          Cpu: 0
-          EntryPoint: []
-          DnsServers: []
+        - Cpu: 0
           Image: "121946529112.dkr.ecr.ap-northeast-1.amazonaws.com/gohanyaapp:v1.0.0"
           Essential: true
           LogConfiguration:
-            SecretOptions: []
             Options:
               awslogs-group: "/ecs/gohanyaapp"
               awslogs-create-group: "true"
               awslogs-region: "ap-northeast-1"
               awslogs-stream-prefix: "ecs"
             LogDriver: "awslogs"
-          ResourceRequirements: []
-          EnvironmentFiles: []
           Name: "gohanyaapp"
-          MountPoints: []
-          DependsOn: []
-          DockerLabels: {}
           PortMappings:
             - ContainerPort: 3000
               AppProtocol: "http"
               Protocol: "tcp"
               HostPort: 3000
               Name: "gohanyaapp-3000-tcp"
-          DockerSecurityOptions: []
-          SystemControls: []
-          Command: []
-          DnsSearchDomains: []
-          Environment: []
-          Links: []
-          CredentialSpecs: []
-          Ulimits: []
       Family: "gohanyaapp"
-      Tags: []
 
 # ------------------------------------------------------------#
 # Output Parameters

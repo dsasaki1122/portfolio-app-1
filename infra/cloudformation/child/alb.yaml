@@ -8,14 +8,23 @@ Parameters:
   PJPrefix:
     Type: String
 
+  InUse:
+    Type: String
+
   VPCId:
     Type: String
 
-  PrivateSubnetA:
+  PublicSubnetA:
     Type: String
 
-  PrivateSubnetC:
+  PublicSubnetC:
     Type: String
+
+# ------------------------------------------------------------#
+# Conditions
+# ------------------------------------------------------------#
+Conditions:
+  CreateResources: !Equals [!Ref InUse, "true"]
 
 Resources:
   # ------------------------------------------------------------#
@@ -42,20 +51,22 @@ Resources:
   # ------------------------------------------------------------#
   LoadBalancer:
     Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Condition: CreateResources
     Properties:
       Type: "application"
       Name: !Sub "${PJPrefix}-alb"
       SecurityGroups:
-        - Ref: "ALBSecurityGroup"
+        - !Ref ALBSecurityGroup
       Subnets:
-        - !Ref PrivateSubnetA
-        - !Ref PrivateSubnetC
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetC
 
   # ------------------------------------------------------------#
   #  Target Group
   # ------------------------------------------------------------#
   TargetGroup:
     Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Condition: CreateResources
     Properties:
       HealthCheckPath: "/"
       Name: !Sub "${PJPrefix}-tg"
@@ -63,8 +74,7 @@ Resources:
       Protocol: "HTTP"
       TargetType: "ip"
       HealthCheckProtocol: "HTTP"
-      VpcId:
-        Ref: "VpcID"
+      VpcId: !Ref VPCId
       TargetGroupAttributes:
         - Key: "deregistration_delay.timeout_seconds"
           Value: "300"
@@ -74,6 +84,7 @@ Resources:
   # ------------------------------------------------------------#
   Listener:
     Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Condition: CreateResources
     Properties:
       DefaultActions:
         - Type: "forward"
@@ -89,7 +100,13 @@ Resources:
 # ------------------------------------------------------------#
 Outputs:
   LoadBalancer:
-    Value: !Ref LoadBalancer
+    Value: !If
+      - CreateResources
+      - !Ref LoadBalancer
+      - "ALB not created"
 
   TargetGroup:
-    Value: !Ref TargetGroup
+    Value: !If
+      - CreateResources
+      - !Ref TargetGroup
+      - "TargetGroup not created"
