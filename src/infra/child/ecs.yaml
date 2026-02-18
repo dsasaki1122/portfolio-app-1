@@ -1,0 +1,250 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ECS Nested Stack
+
+# ------------------------------------------------------------#
+# Input Parameters
+# ------------------------------------------------------------#
+Parameters:
+  PJPrefix:
+    Type: String
+
+  VPCId:
+    Type: String
+
+  VPCCIDR:
+    Type: String
+
+  PrivateSubnetA:
+    Type: String
+
+  PrivateSubnetC:
+    Type: String
+
+  TargetGroup:
+    Type: String
+
+Resources:
+  # ------------------------------------------------------------#
+  #  IAM Policy & Role
+  # ------------------------------------------------------------#
+  # IAM Policy
+  IAMManagedPolicyECSExec:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::IAM::ManagedPolicy"
+    DeletionPolicy: "Delete"
+    Properties:
+      ManagedPolicyName: !Sub "${PJPrefix}-ECSExec"
+      Path: "/"
+      Description: ""
+      Groups: []
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Resource: "*"
+            Action:
+              - "ssmmessages:CreateControlChannel"
+              - "ssmmessages:CreateDataChannel"
+              - "ssmmessages:OpenControlChannel"
+              - "ssmmessages:OpenDataChannel"
+            Effect: "Allow"
+      Users: []
+
+  # ECS TaskRole
+  IAMRoleECSExec:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      Path: "/"
+      ManagedPolicyArns:
+        - Ref: "IAMManagedPolicyECSExec"
+      MaxSessionDuration: 3600
+      RoleName: !Sub "${PJPrefix}-ecs-taskrole"
+      Description: "ECS Task Role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service: "ecs-tasks.amazonaws.com"
+            Sid: ""
+
+  # ECS TaskExecutionRole
+  ECSTaskExecutionRole:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+      MaxSessionDuration: 3600
+      RoleName: !Sub "${PJPrefix}-ecs-taskexecutionrole"
+      Description: "ECS TaskExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service: "ecs-tasks.amazonaws.com"
+            Sid: ""
+
+  # ------------------------------------------------------------#
+  #  ECS Security Group
+  # ------------------------------------------------------------#
+  ECSSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Security group for ECS"
+      GroupName: !Sub "${PJPrefix}-security-group-ecs"
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - FromPort: "3000"
+          ToPort: "3000"
+          IpProtocol: "tcp"
+          CidrIp: !Ref VPCCIDR
+
+  # ------------------------------------------------------------#
+  #  ECS Cluster
+  # ------------------------------------------------------------#
+  ECSCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: !Sub "${PJPrefix}-ecs-cluster"
+      CapacityProviders:
+        - "FARGATE"
+        - "FARGATE_SPOT"
+      ClusterSettings:
+        - Name: "containerInsights"
+          Value: "disabled"
+      Configuration:
+        ExecuteCommandConfiguration:
+          Logging: "DEFAULT"
+      Tags:
+
+  # ------------------------------------------------------------#
+  #  ECS Service
+  # ------------------------------------------------------------#
+  ECSService:
+    Type: "AWS::ECS::Service"
+    Properties:
+      Cluster: !Ref ECSCluster
+      CapacityProviderStrategy:
+        - CapacityProvider: "FARGATE"
+          Base: "0"
+          Weight: "1"
+      TaskDefinition: "arn:aws:ecs:ap-northeast-1:121946529112:task-definition/gohanyaapp:2" #修正
+      ServiceName: !Sub "${PJPrefix}-ecs-service"
+      SchedulingStrategy: "REPLICA"
+      DesiredCount: "1"
+      AvailabilityZoneRebalancing: "ENABLED"
+      LoadBalancers:
+        - ContainerName: "gohanyaapp"
+          ContainerPort: "3000"
+          TargetGroupArn:
+            Ref: "TargetGroup"
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: "ENABLED"
+          SecurityGroups:
+            - Ref: "ECSSecurityGroup"
+          Subnets:
+            - !Ref PrivateSubnetA
+            - !Ref PrivateSubnetC
+      PlatformVersion: "LATEST"
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: "true"
+          Rollback: "true"
+        Strategy: "ROLLING"
+        MaximumPercent: "200"
+        MinimumHealthyPercent: "100"
+      DeploymentController:
+        Type: "ECS"
+      ServiceConnectConfiguration:
+        Enabled: "false"
+      Tags:
+      EnableECSManagedTags: "true"
+      EnableExecuteCommand: "true"
+    DependsOn:
+      - "Listener"
+
+  # ------------------------------------------------------------#
+  #  ECS Task Definition
+  # ------------------------------------------------------------#
+  ECSTaskDefinitionTaskdefinitiongohanyaapp3:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::ECS::TaskDefinition"
+    DeletionPolicy: "Delete"
+    Properties:
+      TaskRoleArn:
+        Fn::GetAtt:
+          - "IAMRoleECSExec"
+          - "Arn"
+      InferenceAccelerators: []
+      Memory: "2048"
+      PlacementConstraints: []
+      Cpu: "512"
+      RequiresCompatibilities:
+        - "FARGATE"
+      NetworkMode: "awsvpc"
+      EnableFaultInjection: false
+      ExecutionRoleArn:
+        Fn::GetAtt:
+          - "gohanyaapp-ECSTaskExecutionRole"
+          - "Arn"
+      RuntimePlatform:
+        OperatingSystemFamily: "LINUX"
+        CpuArchitecture: "ARM64"
+      Volumes: []
+      ContainerDefinitions:
+        - ExtraHosts: []
+          Secrets: []
+          VolumesFrom: []
+          Cpu: 0
+          EntryPoint: []
+          DnsServers: []
+          Image: "121946529112.dkr.ecr.ap-northeast-1.amazonaws.com/gohanyaapp:v1.0.0"
+          Essential: true
+          LogConfiguration:
+            SecretOptions: []
+            Options:
+              awslogs-group: "/ecs/gohanyaapp"
+              awslogs-create-group: "true"
+              awslogs-region: "ap-northeast-1"
+              awslogs-stream-prefix: "ecs"
+            LogDriver: "awslogs"
+          ResourceRequirements: []
+          EnvironmentFiles: []
+          Name: "gohanyaapp"
+          MountPoints: []
+          DependsOn: []
+          DockerLabels: {}
+          PortMappings:
+            - ContainerPort: 3000
+              AppProtocol: "http"
+              Protocol: "tcp"
+              HostPort: 3000
+              Name: "gohanyaapp-3000-tcp"
+          DockerSecurityOptions: []
+          SystemControls: []
+          Command: []
+          DnsSearchDomains: []
+          Environment: []
+          Links: []
+          CredentialSpecs: []
+          Ulimits: []
+      Family: "gohanyaapp"
+      Tags: []
+
+# ------------------------------------------------------------#
+# Output Parameters
+# ------------------------------------------------------------#
+Outputs:
+  ECSCluster:
+    Value: !Ref ECSCluster
+
+  ECSService:
+    Value: !Ref ECSService
