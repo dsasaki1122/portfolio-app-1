@@ -21,8 +21,8 @@ apps/out/
 apps/build
 
 # misc
-apps/.DS_Store
-apps/*.pem
+.DS_Store
+*.pem
 
 # debug
 apps/npm-debug.log*
@@ -39,6 +39,3 @@ apps/.vercel
 # typescript
 apps/*.tsbuildinfo
 apps/next-env.d.ts
-
-# .DS_Store
-.DS_Store
