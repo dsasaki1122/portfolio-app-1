@@ -1,0 +1,27 @@
+version: 0.2
+
+env:
+  variables:
+    IN_USE: "false" # デフォルト
+
+phases:
+  pre_build:
+    commands:
+      - echo "Extract version from package.json"
+      - IMAGE_TAG=$(jq -r .version apps/package.json)
+      - echo "IMAGE_TAG=$IMAGE_TAG"
+
+  build:
+    commands:
+      - cd infra/cloudformation
+      - aws cloudformation package \
+        --template-file root-stack.yaml \
+        --s3-bucket sagashite-meal-cfn-template \
+        --output-template-file packaged.yaml
+      - aws cloudformation deploy \
+        --template-file packaged.yaml \
+        --stack-name sagashite-meal \
+        --capabilities CAPABILITY_NAMED_IAM \
+        --parameter-overrides \
+        IMAGE_TAG=$IMAGE_TAG \
+        InUse=$IN_USE
