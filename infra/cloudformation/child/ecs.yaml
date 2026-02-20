@@ -8,6 +8,9 @@ Parameters:
   PJPrefix:
     Type: String
 
+  IMAGE_TAG:
+    Type: String
+
   InUse:
     Type: String
 
@@ -207,7 +210,7 @@ Resources:
         CpuArchitecture: "ARM64"
       ContainerDefinitions:
         - Cpu: 0
-          Image: "121946529112.dkr.ecr.ap-northeast-1.amazonaws.com/gohanyaapp:v1.0.0"
+          Image: !Sub "121946529112.dkr.ecr.ap-northeast-1.amazonaws.com/gohanyaapp:${IMAGE_TAG}"
           Essential: true
           LogConfiguration:
             Options:
