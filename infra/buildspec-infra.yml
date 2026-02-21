@@ -2,23 +2,22 @@ version: 0.2
 
 env:
   variables:
-    IN_USE: "false" # デフォルト
+    IMAGE_REPO_NAME: sagashite-meal
+    AWS_DEFAULT_REGION: ap-northeast-1
+    IN_USE: "false" # This variable is used to determine whether to deploy the application or not. Set to "true" to deploy, "false" to skip deployment.
 
 phases:
-  # pre_build:
-  #   commands:
+  pre_build:
+    commands:
+      - echo "Fetching image tag from SSM..."
+      - IMAGE_TAG=$(aws ssm get-parameter --name "/$IMAGE_REPO_NAME/imageTag" --query "Parameter.Value" --output text)
+      - echo "IMAGE_TAG=$IMAGE_TAG"
 
   build:
     commands:
       - cd infra/cloudformation
-      - aws cloudformation package \
-        --template-file root-stack.yaml \
-        --s3-bucket sagashite-meal-cfn-template \
-        --output-template-file packaged.yaml
-      - aws cloudformation deploy \
-        --template-file packaged.yaml \
-        --stack-name sagashite-meal \
-        --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides \
-        IMAGE_TAG=$IMAGE_TAG \
-        InUse=$IN_USE
+      - echo "Packaging CloudFormation template..."
+      - aws cloudformation package --template-file root-stack.yaml --s3-bucket sagashite-meal-cfn-template --output-template-file packaged.yaml
+
+      - echo "Deploying CloudFormation stack..."
+      - aws cloudformation deploy --template-file packaged.yaml --stack-name sagashite-meal --capabilities CAPABILITY_NAMED_IAM --parameter-overrides IMAGE_TAG=$IMAGE_TAG InUse=$IN_USE
