@@ -36,7 +36,7 @@ Parameters:
     Type: String
     Default: "sagashite-meal"
 
-  IMAGE_TAG:
+  ImageTag:
     Type: String
     Description: "The image tag to deploy. This is passed from CodeBuild."
 
@@ -121,7 +121,7 @@ Resources:
       TemplateURL: child/ecs.yaml
       Parameters:
         PJPrefix: !Ref PJPrefix
-        IMAGE_TAG: !Ref IMAGE_TAG
+        ImageTag: !Ref ImageTag
         InUse: !Ref InUse
         VPCCIDR: !Ref VPCCIDR
         VPCId: !GetAtt VPCStack.Outputs.VPC

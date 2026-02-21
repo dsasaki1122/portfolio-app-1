@@ -8,7 +8,7 @@ Parameters:
   PJPrefix:
     Type: String
 
-  IMAGE_TAG:
+  ImageTag:
     Type: String
 
   InUse:
@@ -156,7 +156,7 @@ Resources:
       AvailabilityZoneRebalancing: "ENABLED"
       LoadBalancers: !If
         - CreateResources
-        - - ContainerName: "gohanyaapp"
+        - - ContainerName: !Sub "${PJPrefix}"
             ContainerPort: "3000"
             TargetGroupArn: !Ref TargetGroup
         - !Ref "AWS::NoValue"
@@ -210,23 +210,23 @@ Resources:
         CpuArchitecture: "ARM64"
       ContainerDefinitions:
         - Cpu: 0
-          Image: !Sub "121946529112.dkr.ecr.ap-northeast-1.amazonaws.com/gohanyaapp:${IMAGE_TAG}"
+          Image: !Sub "121946529112.dkr.ecr.ap-northeast-1.amazonaws.com/:${ImageTag}"
           Essential: true
           LogConfiguration:
             Options:
-              awslogs-group: "/ecs/gohanyaapp"
+              awslogs-group: !Sub "/ecs/${PJPrefix}"
               awslogs-create-group: "true"
               awslogs-region: "ap-northeast-1"
               awslogs-stream-prefix: "ecs"
             LogDriver: "awslogs"
-          Name: "gohanyaapp"
+          Name: !Sub "${PJPrefix}"
           PortMappings:
             - ContainerPort: 3000
               AppProtocol: "http"
               Protocol: "tcp"
               HostPort: 3000
-              Name: "gohanyaapp-3000-tcp"
-      Family: "gohanyaapp"
+              Name: !Sub "${PJPrefix}-3000-tcp"
+      Family: !Sub "${PJPrefix}"
 
 # ------------------------------------------------------------#
 # Output Parameters
