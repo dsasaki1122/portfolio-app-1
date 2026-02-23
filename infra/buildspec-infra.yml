@@ -15,9 +15,11 @@ phases:
 
   build:
     commands:
+      # Package CloudFormation template
       - cd infra/cloudformation
       - echo "Packaging CloudFormation template..."
       - aws cloudformation package --template-file root-stack.yaml --s3-bucket sagashite-meal-cfn-template --output-template-file packaged.yaml
 
+      # Deploy CloudFormation stack change set
       - echo "Deploying CloudFormation stack..."
-      - aws cloudformation deploy --template-file packaged.yaml --stack-name sagashite-meal --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ImageTag=$IMAGE_TAG InUse=$IN_USE
+      - aws cloudformation deploy --template-file packaged.yaml --stack-name sagashite-meal --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ImageTag=$IMAGE_TAG InUse=$IN_USE --no-execute-changeset
