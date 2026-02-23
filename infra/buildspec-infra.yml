@@ -4,7 +4,7 @@ env:
   variables:
     IMAGE_REPO_NAME: sagashite-meal
     AWS_DEFAULT_REGION: ap-northeast-1
-    IN_USE: "false" # This variable is used to determine whether to deploy the application or not. Set to "true" to deploy, "false" to skip deployment.
+    IN_USE: "true" # This variable is used to determine whether to deploy the application or not. Set to "true" to deploy, "false" to skip deployment.
 
 phases:
   pre_build:
@@ -20,6 +20,7 @@ phases:
       - echo "Packaging CloudFormation template..."
       - aws cloudformation package --template-file root-stack.yaml --s3-bucket sagashite-meal-cfn-template --output-template-file packaged.yaml
 
-      # Deploy CloudFormation stack change set
-      - echo "Deploying CloudFormation stack..."
-      - aws cloudformation deploy --template-file packaged.yaml --stack-name sagashite-meal --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ImageTag=$IMAGE_TAG InUse=$IN_USE --no-execute-changeset
+      # Create CloudFormation stack change set
+      - echo "Creating CloudFormation stack change set..."
+      - CHANGE_SET_NAME="change-set"
+      - aws cloudformation create-change-set --stack-name sagashite-meal --change-set-name $CHANGE_SET_NAME --template-body file://packaged.yaml --capabilities CAPABILITY_NAMED_IAM --parameters ParameterKey=ImageTag,ParameterValue=$IMAGE_TAG ParameterKey=InUse,ParameterValue=$IN_USE
