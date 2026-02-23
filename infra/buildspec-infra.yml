@@ -4,7 +4,7 @@ env:
   variables:
     IMAGE_REPO_NAME: sagashite-meal
     AWS_DEFAULT_REGION: ap-northeast-1
-    IN_USE: "true" # This variable is used to determine whether to deploy the application or not. Set to "true" to deploy, "false" to skip deployment.
+    IN_USE: "false" # This variable is used to determine whether to deploy the application or not. Set to "true" to deploy, "false" to skip deployment.
 
 phases:
   pre_build:
