@@ -1,0 +1,38 @@
+version: 0.2
+
+env:
+  variables:
+    IMAGE_REPO_NAME: sagashite-meal
+    AWS_DEFAULT_REGION: ap-northeast-1
+  parameter-store:
+    DOCKERHUB_USER: "dockerhub_username"
+    DOCKERHUB_PASS: "dockerhub_password"
+
+phases:
+  pre_build:
+    commands:
+      # Log in to ECR
+      - echo Logging in to ECR...
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - IMAGE_TAG=$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - aws ecr get-login-password | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      # Log in to DockerHub
+      - echo Logging in to DockerHub...
+      - echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USER --password-stdin
+      # Extract version from package.json
+      - echo "Extract version from package.json"
+      - IMAGE_TAG=$(jq -r .version apps/package.json)
+      - echo "IMAGE_TAG=$IMAGE_TAG"
+
+  build:
+    commands:
+      - cd apps
+      - docker build --platform linux/arm64 -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+
+  post_build:
+    commands:
+      - echo "Pushing Docker image to ECR..."
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - echo "Saving image tag to SSM"
+      - aws ssm put-parameter --name "/$IMAGE_REPO_NAME/imageTag" --value "$IMAGE_TAG" --type String --overwrite
