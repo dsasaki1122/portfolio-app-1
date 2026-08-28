@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 type Restaurant = {
 	id: number;
@@ -41,10 +42,13 @@ export default function RestaurantsPage() {
 					{/* Main list area */}
 					<section className="flex-1">
 						<div className="flex items-center justify-end mb-4">
-							<button className="inline-flex items-center gap-2 px-4 py-2 bg-white border rounded shadow">
+							<Link
+								href="/restaurants/register"
+								className="inline-flex items-center gap-2 px-4 py-2 bg-white border rounded shadow"
+							>
 								<span className="text-lg">＋</span>
 								<span>レストラン情報追加</span>
-							</button>
+							</Link>
 						</div>
 
 						<div className="space-y-6">

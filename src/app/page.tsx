@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import Modal from "../components/Modal";
 import LoginForm from "../components/LoginForm";
 import RegisterForm from "../components/RegisterForm";
 
 export default function Home() {
+  const router = useRouter();
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
 
@@ -40,6 +42,18 @@ export default function Home() {
               アカウント作成
             </button>
           </div>
+
+          {process.env.NODE_ENV !== "production" && (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => router.push("/restaurants")}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded border border-dashed border-white/50 text-white/80 bg-transparent hover:bg-white/10"
+              >
+                テストログイン（開発用）
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
