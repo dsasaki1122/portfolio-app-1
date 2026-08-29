@@ -1,0 +1,84 @@
+// Prisma schema for 探してMeal (gohan-note-app)
+// docs: https://pris.ly/d/prisma-schema
+// 本番想定: Aurora MySQL 8.0 / 接続文字列は prisma7.config.ts 経由で DATABASE_URL から解決
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+/// アプリ利用者
+model User {
+  id           BigInt   @id @default(autoincrement())
+  name         String   @db.VarChar(255)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurants Restaurant[]
+
+  @@map("users")
+}
+
+/// ユーザーが登録した飲食店
+model Restaurant {
+  id             BigInt    @id @default(autoincrement())
+  userId         BigInt    @map("user_id")
+  name           String    @db.VarChar(255)
+  description    String?   @db.Text
+  address        String?   @db.VarChar(255)
+  nearestStation String?   @map("nearest_station") @db.VarChar(255)
+  rating         Decimal?  @db.Decimal(2, 1)
+  visitedAt      DateTime? @map("visited_at") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images         RestaurantImage[]
+  restaurantTags RestaurantTag[]
+
+  @@index([userId])
+  @@map("restaurants")
+}
+
+/// 飲食店に紐づく画像（最大4枚をアプリ側で制御）
+model RestaurantImage {
+  id           BigInt   @id @default(autoincrement())
+  restaurantId BigInt   @map("restaurant_id")
+  imageUrl     String   @map("image_url") @db.VarChar(1024)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("restaurant_images")
+}
+
+/// タグマスタ
+model Tag {
+  id        BigInt   @id @default(autoincrement())
+  name      String   @unique @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  restaurantTags RestaurantTag[]
+
+  @@map("tags")
+}
+
+/// 飲食店とタグの中間テーブル（多対多）
+model RestaurantTag {
+  restaurantId BigInt @map("restaurant_id")
+  tagId        BigInt @map("tag_id")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tag        Tag        @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([restaurantId, tagId])
+  @@index([tagId])
+  @@map("restaurant_tags")
+}
