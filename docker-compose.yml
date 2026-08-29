@@ -1,0 +1,34 @@
+# ローカル開発用 MySQL 8.0
+# 本番想定の Aurora MySQL 8.0 (aurora-mysql 3.x) と互換を取るためバージョンを 8.0 に固定。
+#
+#   docker compose up -d      # 起動
+#   docker compose ps         # STATUS が healthy になれば準備完了
+#   docker compose down       # 停止（データは volume に残る）
+#   docker compose down -v    # 停止＋データ削除
+#
+# 接続文字列は .env の DATABASE_URL="mysql://root:password@localhost:3306/gohan_note" と一致。
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: gohan-note-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: gohan_note
+      TZ: Asia/Tokyo
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql-data:
