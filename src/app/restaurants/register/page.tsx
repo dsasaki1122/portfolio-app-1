@@ -4,16 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-type RestaurantFormValues = {
-  name: FormDataEntryValue | null;
-  description: FormDataEntryValue | null;
-  address: FormDataEntryValue | null;
-  station: FormDataEntryValue | null;
-  rating: number;
-  visitDate: FormDataEntryValue | null;
-  imageCount: number;
-};
-
 const MAX_IMAGES = 4;
 
 export default function RegisterRestaurantPage() {
@@ -22,6 +12,8 @@ export default function RegisterRestaurantPage() {
   const [images, setImages] = useState<string[]>([]);
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // プレビュー用の object URL をアンマウント時に解放
   useEffect(() => {
@@ -40,21 +32,49 @@ export default function RegisterRestaurantPage() {
     });
   };
 
-  const handleSubmit: React.FormEventHandler<HTMLFormElement> = (e) => {
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+
     const fd = new FormData(e.currentTarget);
-    const data: RestaurantFormValues = {
-      name: fd.get("name"),
-      description: fd.get("description"),
-      address: fd.get("address"),
-      station: fd.get("station"),
+    const tags = String(fd.get("tags") ?? "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    // 写真は S3 未整備のため送信しない（画像なしで登録）。
+    const payload = {
+      name: String(fd.get("name") ?? ""),
+      description: String(fd.get("description") ?? ""),
+      address: String(fd.get("address") ?? ""),
+      nearestStation: String(fd.get("station") ?? ""),
       rating,
-      visitDate: fd.get("visitDate"),
-      imageCount: images.length,
+      visitedAt: String(fd.get("visitDate") ?? "") || null,
+      tags,
     };
-    // TODO: 実際の登録処理をここに接続（現状はバックエンドなし）
-    console.log("register restaurant", data);
-    router.push("/restaurants");
+
+    try {
+      const res = await fetch("/api/restaurants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setError(body.error ?? "登録に失敗しました");
+        return;
+      }
+      router.push("/restaurants");
+      router.refresh();
+    } catch {
+      setError("通信エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const mainImage = images[0];
@@ -170,9 +190,27 @@ export default function RegisterRestaurantPage() {
                 <input name="visitDate" type="date" className="w-full px-3 py-2 border rounded" />
               </div>
 
+              <div>
+                <label className="text-sm block mb-1">タグ（カンマ区切り）</label>
+                <input
+                  name="tags"
+                  type="text"
+                  placeholder="和食, 居酒屋, 駅近"
+                  className="w-full px-3 py-2 border rounded"
+                />
+              </div>
+
+              {error ? (
+                <p className="text-sm text-red-600">{error}</p>
+              ) : null}
+
               <div className="flex justify-center pt-2">
-                <button type="submit" className="px-4 py-2 rounded bg-black text-white">
-                  登録
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
+                >
+                  {submitting ? "登録中..." : "登録"}
                 </button>
               </div>
             </form>

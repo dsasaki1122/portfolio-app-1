@@ -1,4 +1,4 @@
-import type { Restaurant } from "./sampleRestaurants";
+import type { Restaurant } from "@/lib/restaurants";
 
 export type FilterState = {
   keyword: string;
