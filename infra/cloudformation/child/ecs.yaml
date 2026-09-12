@@ -1,0 +1,239 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ECS Nested Stack
+
+# ------------------------------------------------------------#
+# Input Parameters
+# ------------------------------------------------------------#
+Parameters:
+  PJPrefix:
+    Type: String
+
+  ImageTag:
+    Type: String
+
+  InUse:
+    Type: String
+
+  VPCId:
+    Type: String
+
+  VPCCIDR:
+    Type: String
+
+  PublicSubnetA:
+    Type: String
+
+  PublicSubnetC:
+    Type: String
+
+  TargetGroup:
+    Type: String
+
+# ------------------------------------------------------------#
+# Conditions
+# ------------------------------------------------------------#
+Conditions:
+  CreateResources: !Equals [!Ref InUse, "true"]
+
+Resources:
+  # ------------------------------------------------------------#
+  #  IAM Policy & Role
+  # ------------------------------------------------------------#
+  # IAM Policy
+  IAMManagedPolicyECSExec:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::IAM::ManagedPolicy"
+    DeletionPolicy: "Delete"
+    Properties:
+      ManagedPolicyName: !Sub "${PJPrefix}-ECSExec"
+      Path: "/"
+      Description: ""
+      Groups: []
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Resource: "*"
+            Action:
+              - "ssmmessages:CreateControlChannel"
+              - "ssmmessages:CreateDataChannel"
+              - "ssmmessages:OpenControlChannel"
+              - "ssmmessages:OpenDataChannel"
+            Effect: "Allow"
+      Users: []
+
+  # ECS TaskRole
+  IAMRoleECSExec:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      Path: "/"
+      ManagedPolicyArns:
+        - Ref: "IAMManagedPolicyECSExec"
+      MaxSessionDuration: 3600
+      RoleName: !Sub "${PJPrefix}-ecs-taskrole"
+      Description: "ECS Task Role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service: "ecs-tasks.amazonaws.com"
+            Sid: ""
+
+  # ECS TaskExecutionRole
+  ECSTaskExecutionRole:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+      MaxSessionDuration: 3600
+      RoleName: !Sub "${PJPrefix}-ecs-taskexecutionrole"
+      Description: "ECS TaskExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service: "ecs-tasks.amazonaws.com"
+            Sid: ""
+
+  # ------------------------------------------------------------#
+  #  ECS Security Group
+  # ------------------------------------------------------------#
+  ECSSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Security group for ECS"
+      GroupName: !Sub "${PJPrefix}-security-group-ecs"
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - FromPort: "3000"
+          ToPort: "3000"
+          IpProtocol: "tcp"
+          CidrIp: !Ref VPCCIDR
+
+  # ------------------------------------------------------------#
+  #  ECS Cluster
+  # ------------------------------------------------------------#
+  ECSCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: !Sub "${PJPrefix}-ecs-cluster"
+      CapacityProviders:
+        - "FARGATE"
+        - "FARGATE_SPOT"
+      ClusterSettings:
+        - Name: "containerInsights"
+          Value: "disabled"
+      Configuration:
+        ExecuteCommandConfiguration:
+          Logging: "DEFAULT"
+
+  # ------------------------------------------------------------#
+  #  ECS Service
+  # ------------------------------------------------------------#
+  ECSService:
+    Type: "AWS::ECS::Service"
+    Properties:
+      Cluster: !Ref ECSCluster
+      CapacityProviderStrategy:
+        - CapacityProvider: "FARGATE"
+          Base: "0"
+          Weight: "1"
+      TaskDefinition: !Ref ECSTaskDefinition
+      ServiceName: !Sub "${PJPrefix}-ecs-service"
+      SchedulingStrategy: "REPLICA"
+      DesiredCount: !If
+        - CreateResources
+        - 1
+        - 0
+      AvailabilityZoneRebalancing: "ENABLED"
+      LoadBalancers: !If
+        - CreateResources
+        - - ContainerName: !Sub "${PJPrefix}"
+            ContainerPort: "3000"
+            TargetGroupArn: !Ref TargetGroup
+        - !Ref "AWS::NoValue"
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: "ENABLED"
+          SecurityGroups:
+            - Ref: "ECSSecurityGroup"
+          Subnets:
+            - !Ref PublicSubnetA
+            - !Ref PublicSubnetC
+      PlatformVersion: "LATEST"
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: "true"
+          Rollback: "true"
+        Strategy: "ROLLING"
+        MaximumPercent: "200"
+        MinimumHealthyPercent: "100"
+      DeploymentController:
+        Type: "ECS"
+      ServiceConnectConfiguration:
+        Enabled: "false"
+      EnableECSManagedTags: "true"
+      EnableExecuteCommand: "true"
+
+  # ------------------------------------------------------------#
+  #  ECS Task Definition
+  # ------------------------------------------------------------#
+  ECSTaskDefinition:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::ECS::TaskDefinition"
+    DeletionPolicy: "Delete"
+    Properties:
+      TaskRoleArn:
+        Fn::GetAtt:
+          - "IAMRoleECSExec"
+          - "Arn"
+      Memory: "2048"
+      Cpu: "512"
+      RequiresCompatibilities:
+        - "FARGATE"
+      NetworkMode: "awsvpc"
+      EnableFaultInjection: false
+      ExecutionRoleArn:
+        Fn::GetAtt:
+          - "ECSTaskExecutionRole"
+          - "Arn"
+      RuntimePlatform:
+        OperatingSystemFamily: "LINUX"
+        CpuArchitecture: "ARM64"
+      ContainerDefinitions:
+        - Cpu: 0
+          Image: !Sub "121946529112.dkr.ecr.ap-northeast-1.amazonaws.com/${PJPrefix}:${ImageTag}"
+          Essential: true
+          LogConfiguration:
+            Options:
+              awslogs-group: !Sub "/ecs/${PJPrefix}"
+              awslogs-create-group: "true"
+              awslogs-region: "ap-northeast-1"
+              awslogs-stream-prefix: "ecs"
+            LogDriver: "awslogs"
+          Name: !Sub "${PJPrefix}"
+          PortMappings:
+            - ContainerPort: 3000
+              AppProtocol: "http"
+              Protocol: "tcp"
+              HostPort: 3000
+              Name: !Sub "${PJPrefix}-3000-tcp"
+      Family: !Sub "${PJPrefix}"
+
+# ------------------------------------------------------------#
+# Output Parameters
+# ------------------------------------------------------------#
+Outputs:
+  ECSCluster:
+    Value: !Ref ECSCluster
+
+  ECSService:
+    Value: !Ref ECSService
