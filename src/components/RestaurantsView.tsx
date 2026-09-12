@@ -195,6 +195,14 @@ export default function RestaurantsView({ initialRestaurants }: Props) {
                       role="menu"
                       className="absolute right-0 top-full mt-1 z-20 w-32 bg-white border rounded shadow-md py-1"
                     >
+                      <Link
+                        href={`/restaurants/${r.id}/edit`}
+                        role="menuitem"
+                        onClick={() => setOpenMenuId(null)}
+                        className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        編集
+                      </Link>
                       <button
                         type="button"
                         role="menuitem"
