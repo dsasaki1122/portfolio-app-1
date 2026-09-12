@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ALB Nested Stack
+
+# ------------------------------------------------------------#
+# Input Parameters
+# ------------------------------------------------------------#
+Parameters:
+  PJPrefix:
+    Type: String
+
+  InUse:
+    Type: String
+
+  VPCId:
+    Type: String
+
+  PublicSubnetA:
+    Type: String
+
+  PublicSubnetC:
+    Type: String
+
+# ------------------------------------------------------------#
+# Conditions
+# ------------------------------------------------------------#
+Conditions:
+  CreateResources: !Equals [!Ref InUse, "true"]
+
+Resources:
+  # ------------------------------------------------------------#
+  #  Security Group
+  # ------------------------------------------------------------#
+  ALBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Security group for ALB"
+      GroupName: !Sub "${PJPrefix}-security-group-alb"
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - FromPort: "80"
+          ToPort: "80"
+          IpProtocol: "tcp"
+          CidrIp: "0.0.0.0/0"
+        - FromPort: "80"
+          ToPort: "80"
+          IpProtocol: "tcp"
+          CidrIpv6: "::/0"
+
+  # ------------------------------------------------------------#
+  #  ALB
+  # ------------------------------------------------------------#
+  LoadBalancer:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Condition: CreateResources
+    Properties:
+      Type: "application"
+      Name: !Sub "${PJPrefix}-alb"
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetC
+
+  # ------------------------------------------------------------#
+  #  Target Group
+  # ------------------------------------------------------------#
+  TargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Condition: CreateResources
+    Properties:
+      HealthCheckPath: "/"
+      Name: !Sub "${PJPrefix}-tg"
+      Port: "3000"
+      Protocol: "HTTP"
+      TargetType: "ip"
+      HealthCheckProtocol: "HTTP"
+      VpcId: !Ref VPCId
+      TargetGroupAttributes:
+        - Key: "deregistration_delay.timeout_seconds"
+          Value: "300"
+
+  # ------------------------------------------------------------#
+  #  Listener
+  # ------------------------------------------------------------#
+  Listener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Condition: CreateResources
+    Properties:
+      DefaultActions:
+        - Type: "forward"
+          TargetGroupArn:
+            Ref: "TargetGroup"
+      LoadBalancerArn:
+        Ref: "LoadBalancer"
+      Port: "80"
+      Protocol: "HTTP"
+
+# ------------------------------------------------------------#
+# Output Parameters
+# ------------------------------------------------------------#
+Outputs:
+  LoadBalancer:
+    Value: !If
+      - CreateResources
+      - !Ref LoadBalancer
+      - "ALB not created"
+
+  TargetGroup:
+    Value: !If
+      - CreateResources
+      - !Ref TargetGroup
+      - "TargetGroup not created"

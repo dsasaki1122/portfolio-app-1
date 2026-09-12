@@ -3,7 +3,7 @@
 このプロジェクトのローカル DB（Prisma + MySQL）を、クローンした状態から再現するための手順です。
 
 - ローカル: Docker の `mysql:8.0` コンテナ
-- 本番想定: Aurora MySQL 8.0（`src/infra/` の CloudFormation 参照）
+- 本番想定: Aurora MySQL 8.0（`infra/cloudformation/child/rds.yaml` の CloudFormation 参照）
 - ORM: Prisma 7 系（ドライバアダプタ `@prisma/adapter-mariadb` 経由で接続）
 - テーブル定義の正: [`prisma/schema.prisma`](../prisma/schema.prisma)（5テーブル: `users` / `restaurants` / `restaurant_images` / `tags` / `restaurant_tags`）
 
