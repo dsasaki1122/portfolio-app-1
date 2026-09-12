@@ -142,9 +142,18 @@ export default function RestaurantsView({ initialRestaurants }: Props) {
                 key={r.id}
                 className="bg-white border rounded shadow-sm p-4 flex items-center"
               >
-                <div className="w-24 h-24 bg-gray-200 rounded mr-4 shrink-0 flex items-center justify-center">
-                  写真
-                </div>
+                {r.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={r.imageUrl}
+                    alt={r.name}
+                    className="w-24 h-24 object-cover rounded mr-4 shrink-0"
+                  />
+                ) : (
+                  <div className="w-24 h-24 bg-gray-200 rounded mr-4 shrink-0 flex items-center justify-center">
+                    写真
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="font-medium">{r.name}</h3>
