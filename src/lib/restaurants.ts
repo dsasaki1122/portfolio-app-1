@@ -12,6 +12,7 @@ export type Restaurant = {
   nearestStation: string;
   rating: number;
   description?: string;
+  imageUrl?: string;
 };
 
 // Prisma から取得する行の必要部分だけを表す型。
@@ -22,6 +23,7 @@ type RestaurantRow = {
   nearestStation: string | null;
   rating: { toString(): string } | null;
   restaurantTags: { tag: { name: string } }[];
+  images: { imageUrl: string }[];
 };
 
 function toRestaurant(row: RestaurantRow): Restaurant {
@@ -34,6 +36,7 @@ function toRestaurant(row: RestaurantRow): Restaurant {
     nearestStation: row.nearestStation ?? "",
     rating: row.rating == null ? 0 : Number(row.rating.toString()),
     description: row.description ?? undefined,
+    imageUrl: row.images[0]?.imageUrl,
   };
 }
 
@@ -44,14 +47,18 @@ function toRestaurant(row: RestaurantRow): Restaurant {
 export async function listRestaurants(): Promise<Restaurant[]> {
   const rows = await prisma.restaurant.findMany({
     orderBy: { createdAt: "desc" },
-    include: { restaurantTags: { include: { tag: true } } },
+    include: {
+      restaurantTags: { include: { tag: true } },
+      images: { orderBy: { id: "asc" }, take: 1 },
+    },
   });
 
   return rows.map(toRestaurant);
 }
 
-// レストラン作成時の入力。DB スキーマに合わせて写真以外の項目を受け取る。
+// レストラン作成時の入力。
 // rating は 0 / null を「未設定」として扱う（列は nullable な Decimal(2,1)）。
+// imageUrls は RestaurantImage の運用上限（4枚）に合わせてアプリ側で切り詰める。
 export type CreateRestaurantInput = {
   name: string;
   description?: string | null;
@@ -60,7 +67,10 @@ export type CreateRestaurantInput = {
   rating?: number | null;
   visitedAt?: Date | null;
   tags?: string[];
+  imageUrls?: string[];
 };
+
+const MAX_IMAGES = 4;
 
 // 認証未実装のため、作成レコードはすべて seed で作られる demo ユーザーに紐付ける。
 const DEMO_USER_EMAIL = "demo@example.com";
@@ -68,7 +78,7 @@ const DEMO_USER_EMAIL = "demo@example.com";
 /**
  * レストランを 1 件作成して、一覧と同じ正規化済みの型で返す。
  * タグは名前で connectOrCreate する（seed.ts と同じ方式）。
- * 写真は S3 未整備のため対象外＝ RestaurantImage は作らない。
+ * 画像は S3 にアップロード済みのURL（imageUrls）を RestaurantImage として保存する。
  */
 export async function createRestaurant(
   input: CreateRestaurantInput,
@@ -88,6 +98,8 @@ export async function createRestaurant(
   const rating =
     input.rating != null && input.rating > 0 ? input.rating : null;
 
+  const imageUrls = (input.imageUrls ?? []).slice(0, MAX_IMAGES);
+
   const row = await prisma.restaurant.create({
     data: {
       userId: user.id,
@@ -102,8 +114,14 @@ export async function createRestaurant(
           tag: { connectOrCreate: { where: { name }, create: { name } } },
         })),
       },
+      images: {
+        create: imageUrls.map((imageUrl) => ({ imageUrl })),
+      },
     },
-    include: { restaurantTags: { include: { tag: true } } },
+    include: {
+      restaurantTags: { include: { tag: true } },
+      images: { orderBy: { id: "asc" }, take: 1 },
+    },
   });
 
   return toRestaurant(row);

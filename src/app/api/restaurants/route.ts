@@ -76,6 +76,13 @@ export async function POST(request: Request) {
       )
     : [];
 
+  const imageUrls = Array.isArray(data.imageUrls)
+    ? data.imageUrls
+        .map((u) => String(u).trim())
+        .filter((u) => u.length > 0 && u.length <= 1024)
+        .slice(0, 4)
+    : [];
+
   try {
     const created = await createRestaurant({
       name,
@@ -85,6 +92,7 @@ export async function POST(request: Request) {
       rating,
       visitedAt,
       tags,
+      imageUrls,
     });
     return NextResponse.json(created, { status: 201 });
   } catch (e) {
